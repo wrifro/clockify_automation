@@ -1,33 +1,55 @@
 import requests
 import openpyxl
+from tkinter import Tk
+from tkinter.filedialog import askopenfilename
 
 # API Info
-API_KEY = 'ZDQ2YzA4ODktNWM4Ny00MGZhLWFhNGQtMzZhYWM2NjU5OGMx'
+API_KEY = 'OGJmYzE1Y2ItZTk3ZS00M2E2LThhZGUtZWZjMDQ0NzE0M2I0'
 WORKSPACE_ID = '65a9019f3d6c0f48fa86a4f5'
-
 BASE_URL = 'https://api.clockify.me/api/v1'
 
-def read_projects_from_excel(file):
-    # open file
-    wb = openpyxl.load_workbook(file)
-    sheet = wb['projects']
-    projects = []
-    for row in sheet.iter_rows(min_row = 2):
-        name = str(row[0]) + ' - ' + str(row[1])
-        entry = {'name': name}
-        projects.append(entry)
-    return projects
+class ClockifyConnect:
+    def __init__(self, API_KEY, WORKSPACE_ID, BASE_URL):
+        self.api = API_KEY
+        self.workspace_id = WORKSPACE_ID
+        self.base_url = BASE_URL
 
-def create_project_in_clockify(project_data):
-    url = f'{BASE_URL}/workspaces/{WORKSPACE_ID}/projects'
-    headers = {'X-Api-Key': API_KEY}
-    response = requests.post(url, headers=headers,json=project_data)
-    print(response.status_code)
-    response.raise_for_status # raise error for non-200 status codes
+    # Method to take projects from a [properly formatted]
+    # Excel file and transfer them into a lis  adst
+    def read_projects_from_excel(self, file): 
+        # open file
+        wb = openpyxl.load_workbook(file)
+        sheet = wb.active
+        projects = []
+        for row in sheet.iter_rows(min_row = 1):
+            if row[6].value == 'PD1':
+                name = str(row[1].value) + ' - ' + str(row[2].value)
+                archived = True if row[6].value == 'PD0' else False
+                entry = {'name': name,
+                        'archived': archived}
+                projects.append(entry)
 
-projects = read_projects_from_excel("C:\\Users\wright.frost\\OneDrive - V-Nova Services Ltd\\Clockify\\filtered_export_objectives_03-19-2024.xlsx")
+        self.updated_projects = projects
 
-for project in projects:
-    create_project_in_clockify(project)
+    def get_projects(self):
+        url = f'{self.base_url}/workspaces/{WORKSPACE_ID}/projects'
+        response = requests.get(url, headers={'X-API-Key': self.api})
+        self.data = response.json()
+        
+        if response.status_code != 200:
+            print('request failure', response.status_code)
 
-print("Projects created successfully in Clockify!")
+    def update_projects(self):
+        url = f'{self.base_url}/workspaces/{WORKSPACE_ID}/projects'
+        for project in self.updated_projects:
+            response = requests.post(url, headers= {'X-Api-Key': self.api},json=project)
+            if(response.status_code != 200):
+                print(response.status_code,response.text)
+
+if __name__ =='__main__':
+    clockify = ClockifyConnect(API_KEY, WORKSPACE_ID,BASE_URL)
+    Tk().withdraw()
+    filename = askopenfilename()
+    clockify.read_projects_from_excel(filename)
+    # clockify.get_projects()
+    clockify.update_projects()
